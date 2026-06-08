@@ -1,9 +1,8 @@
 const urls = [
-  "http://localhost:3000/",
+  "http://localhost:3334/",
 ];
 
 const REQUESTS_PER_MINUTE = 100;
-const INTERVAL_MS = 60_000;
 
 async function runBatch(batchNumber) {
   const total = urls.length * REQUESTS_PER_MINUTE;
@@ -14,7 +13,7 @@ async function runBatch(batchNumber) {
     for (const url of urls) {
       const index = ++count;
       tasks.push(
-        fetch(url, { signal: AbortSignal.timeout(10_000) })
+        fetch(url, { signal: AbortSignal.timeout(30_000) })
           .then((res) => {
             console.log(`[batch ${batchNumber}] [${index}/${total}] ${res.status} ${url}`);
           })
@@ -25,7 +24,7 @@ async function runBatch(batchNumber) {
     }
   }
 
-  await Promise.all(tasks);
+  await Promise.allSettled(tasks);
 }
 
 let batch = 0;
@@ -37,6 +36,5 @@ async function tick() {
   console.log(`--- Batch ${batch} done ---`);
 }
 
-// Run immediately, then repeat every minute
-tick();
-setInterval(tick, INTERVAL_MS);
+// Run once and finish
+await tick();
