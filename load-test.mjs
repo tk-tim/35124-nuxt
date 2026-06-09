@@ -1,5 +1,5 @@
 const urls = [
-  "http://localhost:3334/",
+  "http://localhost:3000/",
 ];
 
 const REQUESTS_PER_MINUTE = 100;
