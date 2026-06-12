@@ -13,7 +13,7 @@ async function runBatch(batchNumber) {
     for (const url of urls) {
       const index = ++count;
       tasks.push(
-        fetch(url, { signal: AbortSignal.timeout(30_000) })
+        fetch(url, { signal: AbortSignal.timeout(300_000) })
           .then((res) => {
             console.log(`[batch ${batchNumber}] [${index}/${total}] ${res.status} ${url}`);
           })

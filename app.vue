@@ -5,24 +5,49 @@
   </div>
 </template>
 <script setup lang="ts">
-const onRequest = () => {
-  // MEMORY LEAK: This will cause a memory leak as the route object will be retained in memory for every request, even after the request is completed.
-  // This is because the onRequest function creates a closure that captures the route object, and the onRequest function is called for every request.
-  // As a result, the route object will be retained in memory for every request, even after the request is completed, leading to a memory leak over time as more and more requests are made.
-  const route = useRoute()
+import { ApolloClient, HttpLink, InMemoryCache, from, gql } from '@apollo/client/core'
+import { onError } from '@apollo/client/link/error'
 
-  return (context: any) => {
-    console.log('onRequest', route.fullPath, !!context)
-  }
+function createSimpleApolloClient() {
+  const httpLink = new HttpLink({
+    uri: `https://countries.trevorblades.com/graphql`,
+    fetch,
+    credentials: 'include',
+  })
+
+  const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
+    if (graphQLErrors?.length) {
+      console.warn('GraphQL errors in', operation.operationName, graphQLErrors)
+    }
+    if (networkError) {
+      console.warn('Network error in', operation.operationName, networkError)
+    }
+  })
+
+  const client = new ApolloClient({
+    link: from([errorLink, httpLink]),
+    cache: new InMemoryCache(),
+    defaultOptions: {
+      watchQuery: { fetchPolicy: 'cache-and-network', errorPolicy: 'ignore' },
+      query: { fetchPolicy: 'network-only', errorPolicy: 'all' },
+      mutate: { errorPolicy: 'all' },
+    },
+  })
+
+  return client
 }
 
-const apiFetch = $fetch.create({
-  baseURL: 'https://jsonplaceholder.typicode.com/',
-  onRequest: onRequest(),
-  onRequestError: context => console.log(context),
-  onResponseError: context => console.log(context),
-  timeout: 30000,
-})
+const apollo = createSimpleApolloClient()
 
-useAsyncData('fancyData', () => apiFetch('/todos'))
+await useAsyncData('fancyData', () => apollo.query({
+  query: gql`
+    query {
+      countries {
+        code
+        name
+        emoji
+      }
+    }
+  `,
+}))
 </script>
