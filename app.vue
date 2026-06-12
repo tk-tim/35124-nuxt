@@ -1,12 +1,12 @@
 <template>
   <div>
-    <NuxtRouteAnnouncer />
-    <NuxtWelcome />
+    {{ data }}
   </div>
 </template>
 <script setup lang="ts">
-import { ApolloClient, HttpLink, InMemoryCache, from, gql } from '@apollo/client/core'
-import { onError } from '@apollo/client/link/error'
+import { ApolloClient, ApolloLink, HttpLink, InMemoryCache, gql } from '@apollo/client/core'
+import { CombinedGraphQLErrors } from '@apollo/client/errors'
+import { ErrorLink } from '@apollo/client/link/error'
 
 function createSimpleApolloClient() {
   const httpLink = new HttpLink({
@@ -15,23 +15,18 @@ function createSimpleApolloClient() {
     credentials: 'include',
   })
 
-  const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
-    if (graphQLErrors?.length) {
-      console.warn('GraphQL errors in', operation.operationName, graphQLErrors)
+  const errorLink = new ErrorLink(({ error, operation }) => {
+    if (CombinedGraphQLErrors.is(error)) {
+      console.warn('GraphQL errors in', operation.operationName, error.errors)
+      return
     }
-    if (networkError) {
-      console.warn('Network error in', operation.operationName, networkError)
-    }
+
+    console.warn('Network error in', operation.operationName, error)
   })
 
   const client = new ApolloClient({
-    link: from([errorLink, httpLink]),
+    link: ApolloLink.from([errorLink, httpLink]),
     cache: new InMemoryCache(),
-    defaultOptions: {
-      watchQuery: { fetchPolicy: 'cache-and-network', errorPolicy: 'ignore' },
-      query: { fetchPolicy: 'network-only', errorPolicy: 'all' },
-      mutate: { errorPolicy: 'all' },
-    },
   })
 
   return client
@@ -39,15 +34,33 @@ function createSimpleApolloClient() {
 
 const apollo = createSimpleApolloClient()
 
-await useAsyncData('fancyData', () => apollo.query({
-  query: gql`
-    query {
-      countries {
-        code
-        name
-        emoji
-      }
+const { data } = await useAsyncData('fancyData', async () => {
+  try {
+    const result = await apollo.query({
+      query: gql`
+        query {
+          countries {
+            code
+            name
+            emoji
+          }
+        }
+      `,
+      fetchPolicy: 'network-only',
+      errorPolicy: 'all',
+    })
+
+    return {
+      data: result.data,
+      error: result.error
+        ? { name: result.error.name, message: result.error.message }
+        : null,
     }
-  `,
-}))
+  } catch (error) {
+    return {
+      data: null,
+      error,
+    }
+  }
+})
 </script>
