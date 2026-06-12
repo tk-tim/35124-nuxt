@@ -4,51 +4,43 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ApolloClient, ApolloLink, HttpLink, InMemoryCache, gql } from '@apollo/client/core'
-import { CombinedGraphQLErrors } from '@apollo/client/errors'
-import { ErrorLink } from '@apollo/client/link/error'
+import { cacheExchange, createClient, fetchExchange } from '@urql/core'
 
-function createSimpleApolloClient() {
-  const httpLink = new HttpLink({
-    uri: `https://countries.trevorblades.com/graphql`,
-    fetch,
-    credentials: 'include',
+function createSimpleUrqlClient() {
+  return createClient({
+    url: 'https://countries.trevorblades.com/graphqle',
+    exchanges: [cacheExchange, fetchExchange],
+    fetchOptions: {
+      credentials: 'include',
+    },
   })
-
-  const errorLink = new ErrorLink(({ error, operation }) => {
-    if (CombinedGraphQLErrors.is(error)) {
-      console.warn(JSON.stringify({ message: 'GraphQL errors in', operation: operation.operationName, errors: error.errors }))
-      return
-    }
-
-    console.warn(JSON.stringify({ message: 'Network error in', operation: operation.operationName, error }))
-  })
-
-  const client = new ApolloClient({
-    link: ApolloLink.from([errorLink, httpLink]),
-    cache: new InMemoryCache(),
-  })
-
-  return client
 }
 
-const apollo = createSimpleApolloClient()
+const urql = createSimpleUrqlClient()
+
+const COUNTRIES_QUERY = `
+  query Countries {
+    countries {
+      code
+      name
+      emoji
+    }
+  }
+`
 
 const { data } = await useAsyncData('fancyData', async () => {
   try {
-    const result = await apollo.query({
-      query: gql`
-        query {
-          countries {
-            code
-            name
-            emoji
-          }
-        }
-      `,
-      fetchPolicy: 'network-only',
-      errorPolicy: 'all',
-    })
+    const result = await urql
+      .query(COUNTRIES_QUERY, {}, { requestPolicy: 'network-only' })
+      .toPromise()
+
+    if (result.error?.graphQLErrors.length) {
+      console.warn('GraphQL errors in Countries', JSON.stringify(result.error.graphQLErrors))
+    }
+
+    if (result.error?.networkError) {
+      console.warn('Network error in Countries', JSON.stringify(result.error.networkError))
+    }
 
     return {
       data: result.data,
@@ -57,6 +49,7 @@ const { data } = await useAsyncData('fancyData', async () => {
         : null,
     }
   } catch (error) {
+    console.error('Error fetching Countries', JSON.stringify(error))
     return {
       data: null,
       error,
