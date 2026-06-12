@@ -17,11 +17,11 @@ function createSimpleApolloClient() {
 
   const errorLink = new ErrorLink(({ error, operation }) => {
     if (CombinedGraphQLErrors.is(error)) {
-      console.warn('GraphQL errors in', operation.operationName, error.errors)
+      console.warn(JSON.stringify({ message: 'GraphQL errors in', operation: operation.operationName, errors: error.errors }))
       return
     }
 
-    console.warn('Network error in', operation.operationName, error)
+    console.warn(JSON.stringify({ message: 'Network error in', operation: operation.operationName, error }))
   })
 
   const client = new ApolloClient({
